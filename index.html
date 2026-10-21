@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Planning des coachs</title>
+  <meta name="theme-color" content="#0f766e">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- app.js déclare le composant : il doit être chargé avant Alpine -->
+  <script src="js/app.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.1/dist/cdn.min.js"></script>
+</head>
+<body x-data="app" x-cloak>
+
+  <!-- ========== Chargement ========== -->
+  <main x-show="view === 'loading'" class="center">
+    <p class="muted">Chargement…</p>
+  </main>
+
+  <!-- ========== Accueil + connexion ========== -->
+  <main x-show="view === 'login'" class="login">
+    <h1>Planning des coachs</h1>
+    <p>Indiquez quand vous pouvez coacher cette semaine ou la semaine prochaine. Choisissez vos créneaux, envoyez, c'est tout.
+      Vous pouvez modifier votre réponse à tout moment jusqu'au dimanche 21:00.</p>
+
+    <form @submit.prevent="login" class="stack">
+      <label>Email
+        <input type="email" x-model="id" required autocomplete="email" inputmode="email">
+      </label>
+      <label>Code coach
+        <input x-model="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off">
+      </label>
+      <p class="error" x-show="error" x-text="error"></p>
+      <button :disabled="busy" x-text="busy ? 'Connexion…' : 'Se connecter'"></button>
+    </form>
+
+    <p class="muted small">Votre email, votre nom et vos disponibilités sont enregistrés dans le Google Sheet de l'association
+      et servent uniquement à organiser les séances. Votre email et votre code sont mémorisés sur cet appareil.</p>
+  </main>
+
+  <!-- ========== Connecté ========== -->
+  <template x-if="view === 'form' || view === 'availability'">
+    <div>
+      <header class="topbar">
+        <strong>Planning des coachs</strong>
+        <span class="muted small">
+          <span x-text="name"></span> ·
+          <button type="button" class="link" @click="code = ''; logout()">Se déconnecter</button>
+        </span>
+      </header>
+
+      <nav class="segmented">
+        <button type="button" :aria-pressed="view === 'form'" @click="view = 'form'; error = ''">Mes créneaux</button>
+        <button type="button" :aria-pressed="view === 'availability'" @click="showAvailability">Disponibilités</button>
+      </nav>
+
+      <div class="weeks">
+        <template x-for="w in weeks" :key="w">
+          <button type="button" class="week" :aria-pressed="week === w" @click="selectWeek(w)">
+            <strong x-text="weekTitle(w)"></strong>
+            <span class="small" x-text="weekRange(w)"></span>
+          </button>
+        </template>
+      </div>
+
+      <p class="error" x-show="error" x-text="error"></p>
+
+      <!-- ----- Mes créneaux ----- -->
+      <main x-show="view === 'form'">
+        <p class="muted small" x-text="status"></p>
+
+        <div class="stack">
+          <template x-for="(slot, i) in slots" :key="slot.key">
+            <div class="slot">
+              <select class="day" x-model="slot.day" aria-label="Jour">
+                <template x-for="d in DAYS">
+                  <option :value="d.code" x-text="d.label" :selected="d.code === slot.day"></option>
+                </template>
+              </select>
+              <button type="button" class="remove" @click="removeSlot(i)" aria-label="Supprimer le créneau">✕</button>
+              <select x-model="slot.start" @change="fixEnd(slot)" aria-label="Heure de début">
+                <template x-for="t in TIMES.slice(0, -1)">
+                  <option :value="t" x-text="t" :selected="t === slot.start"></option>
+                </template>
+              </select>
+              <select x-model="slot.end" aria-label="Heure de fin">
+                <template x-for="t in endTimes(slot)">
+                  <option :value="t" x-text="t" :selected="t === slot.end"></option>
+                </template>
+              </select>
+            </div>
+          </template>
+
+          <p class="empty" x-show="!slots.length">Aucun créneau : en envoyant, vous serez noté(e) indisponible cette semaine.</p>
+
+          <button type="button" class="secondary" @click="addSlot">+ Ajouter un créneau</button>
+        </div>
+
+        <div class="bottombar">
+          <button type="button" @click="submit" :disabled="busy"
+                  x-text="busy ? 'Enregistrement…' : slots.length ? 'Envoyer' : 'Envoyer : pas disponible'"></button>
+        </div>
+      </main>
+
+      <!-- ----- Disponibilités ----- -->
+      <main x-show="view === 'availability'">
+        <div class="days">
+          <template x-for="d in DAYS" :key="d.code">
+            <button type="button" :aria-pressed="availDay === d.code" @click="availDay = d.code">
+              <span x-text="d.short"></span>
+              <span class="small peak" x-text="avail ? dayPeak(d.code) : ''"></span>
+            </button>
+          </template>
+        </div>
+
+        <p class="muted small" x-show="!avail && !error">Chargement…</p>
+        <p class="muted small" x-show="avail" x-text="`${avail?.respondents} coach${avail?.respondents > 1 ? 's ont' : ' a'} répondu pour cette semaine`"></p>
+
+        <ol class="rows" x-show="avail">
+          <template x-for="row in rows" :key="row.t">
+            <li :class="{ quiet: !row.names.length }" :style="`--pct: ${row.pct}%`">
+              <span class="time" x-text="row.t"></span>
+              <span class="names" x-text="row.names.join(', ')"></span>
+              <span class="count" x-text="row.names.length || ''"></span>
+            </li>
+          </template>
+        </ol>
+      </main>
+    </div>
+  </template>
+
+  <div class="toast" x-show="message" x-transition.opacity x-text="message" role="status"></div>
+</body>
+</html>

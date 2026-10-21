@@ -1,0 +1,260 @@
+/* Planning des coachs — pensé pour mobile, sans framework. Toutes les couleurs sont dans :root. */
+
+:root {
+  --bg: #f5f6f8;
+  --surface: #ffffff;
+  --text: #1b1f24;
+  --muted: #667085;
+  --border: #d9dde3;
+  --accent: #0f766e;
+  --accent-text: #ffffff;
+  --accent-soft: #cdeee9;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  --radius: 12px;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #111418;
+    --surface: #1b2027;
+    --text: #e8eaed;
+    --muted: #9aa4b2;
+    --border: #323943;
+    --accent: #2dd4bf;
+    --accent-text: #08201d;
+    --accent-soft: #134e48;
+    --danger: #f97066;
+    --danger-soft: #3b1a17;
+  }
+}
+
+* { box-sizing: border-box; }
+[x-cloak] { display: none !important; }
+
+html { background: var(--bg); -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+main, .topbar, .segmented, .weeks, body > div > .error {
+  max-width: 34rem;
+  margin-inline: auto;
+  padding-inline: 16px;
+}
+
+main { padding-bottom: 24px; }
+h1 { margin: 32px 0 8px; font-size: 1.75rem; }
+p { margin: 12px 0; }
+
+.muted { color: var(--muted); }
+.small { font-size: 0.875rem; }
+.center { display: grid; place-items: center; min-height: 60vh; }
+.stack { display: grid; gap: 12px; }
+
+/* ---------- Champs et boutons (police à 16px : évite le zoom automatique d'iOS au focus) ---------- */
+
+input, select, button {
+  font: inherit;
+  font-size: 16px;
+  min-height: 48px;
+  width: 100%;
+  border-radius: var(--radius);
+}
+
+label { display: grid; gap: 4px; font-weight: 600; }
+
+input, select {
+  padding: 0 14px;
+  color: var(--text);
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+}
+
+select {
+  appearance: none;
+  padding-right: 36px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 20px) 50%, calc(100% - 14px) 50%;
+  background-size: 6px 6px;
+  background-repeat: no-repeat;
+}
+
+input:focus, select:focus, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+button {
+  border: 0;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  cursor: pointer;
+}
+
+button:disabled { opacity: 0.6; cursor: default; }
+
+button.secondary {
+  color: var(--accent);
+  background: transparent;
+  border: 1.5px dashed var(--accent);
+}
+
+button.link {
+  display: inline;
+  width: auto;
+  min-height: 0;
+  padding: 0;
+  font-size: inherit;
+  font-weight: 400;
+  color: var(--accent);
+  background: none;
+  text-decoration: underline;
+}
+
+.error {
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+/* ---------- En-tête, onglets, choix de la semaine ---------- */
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding-block: 16px 8px;
+}
+
+.segmented, .weeks, .days {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 8px;
+  margin-block: 8px;
+}
+
+.segmented button, .weeks button, .days button {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.segmented button[aria-pressed="true"],
+.weeks button[aria-pressed="true"],
+.days button[aria-pressed="true"] {
+  color: var(--accent-text);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.week {
+  display: grid;
+  place-content: center;
+  min-height: 60px;
+  line-height: 1.3;
+}
+
+.week span { font-weight: 400; }
+
+/* ---------- Cartes de créneaux ---------- */
+
+.slot {
+  display: grid;
+  grid-template-columns: 1fr 1fr 48px;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.slot .day { grid-column: 1 / 3; }
+
+.slot .remove {
+  color: var(--muted);
+  background: transparent;
+  font-size: 1.125rem;
+}
+
+.empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+.bottombar {
+  position: sticky;
+  bottom: 0;
+  margin-top: 16px;
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(transparent, var(--bg) 30%);
+}
+
+/* ---------- Disponibilités ---------- */
+
+.days { gap: 4px; }
+
+.days button {
+  display: grid;
+  place-content: center;
+  min-height: 52px;
+  padding: 0;
+  line-height: 1.2;
+  font-size: 0.875rem;
+}
+
+.days .peak { font-weight: 400; opacity: 0.8; }
+
+.rows {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+/* Le fond de chaque ligne sert de barre : largeur = part des répondants disponibles */
+.rows li {
+  display: grid;
+  grid-template-columns: 3.25rem 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: linear-gradient(to right, var(--accent-soft) var(--pct), var(--surface) var(--pct));
+}
+
+.rows li.quiet { min-height: 28px; padding-block: 2px; background: transparent; color: var(--muted); }
+.rows .time { font-variant-numeric: tabular-nums; font-size: 0.875rem; }
+.rows .names { font-size: 0.9375rem; }
+.rows .count { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* ---------- Message de confirmation ---------- */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: var(--accent-text);
+  background: var(--accent);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.2);
+}
