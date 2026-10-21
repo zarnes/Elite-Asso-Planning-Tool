@@ -1,6 +1,6 @@
-# Planning des coachs
+# Planning des représentants
 
-Une petite page web où les coachs de l'association indiquent leurs créneaux de disponibilité, pour cette semaine ou la suivante, et consultent les disponibilités des autres.
+Une petite page web où les représentants de l'association indiquent leurs créneaux de disponibilité, pour cette semaine ou la suivante, et consultent les disponibilités des autres.
 
 - **Frontend :** des fichiers statiques hébergés sur GitHub Pages. Du HTML/CSS simple, plus [Alpine.js](https://alpinejs.dev) chargé depuis un CDN. Aucune étape de build.
 - **Backend :** un Google Apps Script lié à un Google Sheet. Le Sheet sert de base de données.
@@ -16,11 +16,11 @@ apps-script/appsscript.json  réglages Apps Script (fuseau horaire, accès à l'
 
 ## Fonctionnement
 
-1. Un coach se connecte avec son **email + code coach**, tous deux listés dans l'onglet `Membres`. Ils sont mémorisés sur l'appareil (`localStorage`).
+1. Un représentant se connecte avec son **email + code représentant**, tous deux listés dans l'onglet `Membres`. Ils sont mémorisés sur l'appareil (`localStorage`).
 2. Il choisit une semaine et ajoute des créneaux (jour, début, fin). Chaque créneau est découpé en demi-heures : lundi 06:00–07:00 → `Mo:0600,Mo:0630`.
 3. Envoyer le formulaire remplace sa réponse précédente pour cette semaine. Envoyer sans aucun créneau signifie « pas disponible ».
 4. Jusqu'au **dimanche 21:00** (heure de Paris), les semaines ouvertes sont cette semaine et la suivante. Ensuite, la suivante et celle d'après.
-5. Chaque dimanche vers 21:30, un déclencheur déplace les réponses de la semaine terminée de `Réponses` vers `Historique`, et y ajoute une ligne « sans réponse » pour chaque coach de `Membres` qui n'a pas répondu.
+5. Chaque dimanche vers 21:30, un déclencheur déplace les réponses de la semaine terminée de `Réponses` vers `Historique`, et y ajoute une ligne « sans réponse » pour chaque représentant de `Membres` qui n'a pas répondu.
 
 ### Onglets du Sheet
 
@@ -32,16 +32,16 @@ apps-script/appsscript.json  réglages Apps Script (fuseau horaire, accès à l'
 | `Analyse` | grille jours × heures, réponses par semaine | Des formules (créées par `setup`) |
 | `Erreurs` | date, action, erreur | Le script, en cas de problème |
 
-- **Une ligne = la réponse d'un coach pour une semaine.** Les 210 colonnes de demi-heures (7 jours × 30) contiennent `1` si le coach est disponible, et restent vides sinon. Les cases à `1` sont colorées : chaque ligne se lit comme la semaine du coach.
+- **Une ligne = la réponse d'un représentant pour une semaine.** Les 210 colonnes de demi-heures (7 jours × 30) contiennent `1` si le représentant est disponible, et restent vides sinon. Les cases à `1` sont colorées : chaque ligne se lit comme la semaine du représentant.
 - `statut` vaut `disponible`, `indisponible` (a répondu sans créneau) ou `sans réponse` (ajouté par l'archivage du dimanche).
 - `semaine` est toujours la date du lundi, en texte, par ex. `2026-10-26`.
-- `nom` est recopié au moment de l'envoi : c'est ce que les autres coachs voient sur la page des disponibilités, et l'historique reste lisible même après le départ d'un coach. Les emails ne sont jamais affichés dans l'app.
+- `nom` est recopié au moment de l'envoi : c'est ce que les autres représentants voient sur la page des disponibilités, et l'historique reste lisible même après le départ d'un représentant. Les emails ne sont jamais affichés dans l'app.
 
 ## Analyse des données
 
-- **Créneaux les plus vides / les plus pleins :** l'onglet `Analyse` affiche une grille heures × jours avec le nombre moyen de coachs disponibles par semaine, coloré du rouge (vide) au vert (plein). Choisissez une semaine en `B1` pour n'afficher que celle-ci ; laissez `B1` vide pour la moyenne sur tout l'historique.
-- **Qui a répondu chaque semaine :** à droite de la grille, le nombre de coachs disponibles / indisponibles / sans réponse par semaine. Pour les noms, filtrez `Historique` sur la colonne `semaine` (Données → Créer un filtre).
-- **Totaux filtrés :** la ligne 2 de `Historique` additionne chaque demi-heure sur les lignes visibles. Filtrez par semaine, par coach ou par statut, et les totaux suivent.
+- **Créneaux les plus vides / les plus pleins :** l'onglet `Analyse` affiche une grille heures × jours avec le nombre moyen de représentants disponibles par semaine, coloré du rouge (vide) au vert (plein). Choisissez une semaine en `B1` pour n'afficher que celle-ci ; laissez `B1` vide pour la moyenne sur tout l'historique.
+- **Qui a répondu chaque semaine :** à droite de la grille, le nombre de représentants disponibles / indisponibles / sans réponse par semaine. Pour les noms, filtrez `Historique` sur la colonne `semaine` (Données → Créer un filtre).
+- **Totaux filtrés :** la ligne 2 de `Historique` additionne chaque demi-heure sur les lignes visibles. Filtrez par semaine, par représentant ou par statut, et les totaux suivent.
 
 Les données de la semaine en cours sont dans `Réponses` ; elles n'apparaissent dans l'analyse qu'après l'archivage du dimanche.
 
@@ -55,8 +55,8 @@ Créez tout avec le **compte Google de l'association**, pas un compte personnel,
 3. Dans l'éditeur, sélectionnez la fonction `setup` et cliquez sur **Exécuter**. Acceptez les autorisations.
    Cela crée les onglets (dont `Analyse`) et installe le déclencheur du dimanche.
    Si un onglet contient déjà des données dans un ancien format, `setup` s'arrête avec un message : videz ou supprimez cet onglet, puis relancez.
-4. Remplissez l'onglet `Membres` : une ligne par coach avec `email` et `nom`, par ex. `Alice B.`.
-   Lancez ensuite `generateCodes` pour attribuer un code à chaque coach. Envoyez son code à chaque coach.
+4. Remplissez l'onglet `Membres` : une ligne par représentant avec `email` et `nom`, par ex. `Alice B.`.
+   Lancez ensuite `generateCodes` pour attribuer un code à chaque représentant. Envoyez son code à chaque représentant.
 5. **Déployer → Nouveau déploiement → Application web**
    - Exécuter en tant que : **Moi**
    - Qui a accès : **Tout le monde**
@@ -67,8 +67,8 @@ Créez tout avec le **compte Google de l'association**, pas un compte personnel,
 
 ## Administration courante
 
-- **Ajouter un coach :** ajoutez une ligne dans `Membres`, lancez `generateCodes`, et envoyez-lui son code.
-- **Retirer un coach :** supprimez sa ligne dans `Membres`. Son historique est conservé.
+- **Ajouter un représentant :** ajoutez une ligne dans `Membres`, lancez `generateCodes`, et envoyez-lui son code.
+- **Retirer un représentant :** supprimez sa ligne dans `Membres`. Son historique est conservé.
 - **Réinitialiser un code :** videz la cellule et lancez `generateCodes`.
 - **Un problème ?** Regardez l'onglet `Erreurs`, et **Exécutions** dans l'éditeur Apps Script.
 
@@ -99,6 +99,6 @@ Ou utilisez [clasp](https://github.com/google/clasp) pour pousser depuis le dép
 ## Remarques
 
 - Les requêtes sont volontairement envoyées en POST `text/plain`. Un `Content-Type` JSON déclencherait une requête CORS préalable (preflight), à laquelle Apps Script ne sait pas répondre.
-- L'URL de l'API est visible par tous dans le code de la page. C'est normal : la protection, c'est le code coach, vérifié côté serveur. Le Sheet lui-même reste privé : partagez-le uniquement avec les administrateurs.
-- Les disponibilités sont mises en cache 5 minutes, et rafraîchies à chaque envoi. Un changement de nom dans `Membres` n'apparaît qu'au prochain envoi du coach concerné.
-- Le code coach protège des personnes extérieures, mais ce n'est pas une sécurité forte. Ne stockez rien de sensible dans ce Sheet.
+- L'URL de l'API est visible par tous dans le code de la page. C'est normal : la protection, c'est le code représentant, vérifié côté serveur. Le Sheet lui-même reste privé : partagez-le uniquement avec les administrateurs.
+- Les disponibilités sont mises en cache 5 minutes, et rafraîchies à chaque envoi. Un changement de nom dans `Membres` n'apparaît qu'au prochain envoi du représentant concerné.
+- Le code représentant protège des personnes extérieures, mais ce n'est pas une sécurité forte. Ne stockez rien de sensible dans ce Sheet.

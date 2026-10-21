@@ -1,13 +1,13 @@
 /**
- * Planning des coachs — backend.
+ * Planning des représentants — backend.
  * Google Apps Script lié au Google Sheet du planning. Mise en place : voir README.md.
  *
  * Onglets :
  *   Membres     email | nom | code | derniers créneaux   (rempli à la main, sauf « derniers créneaux »)
  *   Réponses    semaine | email | nom | envoyé le | statut | nb créneaux | Lun 06:00 | … | Dim 20:30
- *               Une ligne par coach et par semaine ouverte. 1 = disponible sur cette demi-heure.
+ *               Une ligne par représentant et par semaine ouverte. 1 = disponible sur cette demi-heure.
  *   Historique  mêmes colonnes, rempli chaque dimanche. Ligne 2 : totaux par demi-heure.
- *               Contient aussi une ligne « sans réponse » pour chaque coach qui n'a pas répondu.
+ *               Contient aussi une ligne « sans réponse » pour chaque représentant qui n'a pas répondu.
  *   Analyse     grille jours × heures et réponses par semaine, calculées par formules depuis Historique
  *   Erreurs     date | action | erreur
  *
@@ -57,7 +57,7 @@ function doPost(e) {
 
 // ---------- Actions ----------
 
-/** Tout ce dont l'app a besoin au chargement : semaines ouvertes, réponses du coach, pré-remplissage. */
+/** Tout ce dont l'app a besoin au chargement : semaines ouvertes, réponses du représentant, pré-remplissage. */
 function init(member) {
   const weeks = allowedWeeks();
   const entries = {};
@@ -70,7 +70,7 @@ function init(member) {
   return { ok: true, name: member.name, weeks, entries, lastSlots: member.lastSlots };
 }
 
-/** Remplace la réponse du coach pour cette semaine. Aucun créneau = pas disponible. */
+/** Remplace la réponse du représentant pour cette semaine. Aucun créneau = pas disponible. */
 function submit(member, week, slots) {
   if (!allowedWeeks().includes(week)) return { ok: false, error: 'week_closed' };
   if (!Array.isArray(slots)) return { ok: false, error: 'bad_slots' };
@@ -121,7 +121,7 @@ function availability(week) {
 
 /**
  * Déplace les réponses des semaines fermées de Réponses vers Historique,
- * en ajoutant une ligne « sans réponse » pour chaque coach qui n'a pas répondu.
+ * en ajoutant une ligne « sans réponse » pour chaque représentant qui n'a pas répondu.
  */
 function archiveWeek() {
   const firstOpen = allowedWeeks()[0];
@@ -186,7 +186,7 @@ function setup() {
     sh.setColumnWidths(FIRST_SLOT_COL, SLOTS.length, 72);
   });
 
-  // Ligne 2 de Historique : nombre de coachs disponibles par demi-heure, sur les lignes visibles
+  // Ligne 2 de Historique : nombre de représentants disponibles par demi-heure, sur les lignes visibles
   // (SUBTOTAL ignore les lignes masquées par un filtre : filtrer une semaine donne ses totaux)
   const hist = sheet('Historique');
   hist.getRange(2, 1).setValue('Total (lignes filtrées)');
@@ -263,9 +263,9 @@ function colorScale(range) {
 
 /**
  * Onglet Analyse, entièrement en formules (recréé à chaque setup) :
- * - une grille heures × jours : nombre moyen de coachs disponibles par semaine,
+ * - une grille heures × jours : nombre moyen de représentants disponibles par semaine,
  *   ou pour une seule semaine si elle est choisie en B1 ;
- * - à droite, le nombre de coachs disponibles / indisponibles / sans réponse par semaine.
+ * - à droite, le nombre de représentants disponibles / indisponibles / sans réponse par semaine.
  */
 function buildAnalysis() {
   const ss = SpreadsheetApp.getActive();
@@ -321,7 +321,7 @@ function slotsOf(row) {
 }
 
 /**
- * Les deux semaines que les coachs peuvent remplir, sous forme de dates du lundi.
+ * Les deux semaines que les représentants peuvent remplir, sous forme de dates du lundi.
  * Jusqu'au dimanche 21:00 (heure de Paris) : cette semaine et la suivante. Ensuite : la suivante et celle d'après.
  */
 function allowedWeeks() {

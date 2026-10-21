@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Planning des coachs</title>
+  <title>Planning des représentants</title>
   <meta name="theme-color" content="#0f766e">
   <link rel="manifest" href="manifest.json">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
@@ -22,15 +22,15 @@
 
   <!-- ========== Accueil + connexion ========== -->
   <main x-show="view === 'login'" class="login">
-    <h1>Planning des coachs</h1>
-    <p>Indiquez quand vous pouvez coacher cette semaine ou la semaine prochaine. Choisissez vos créneaux, envoyez, c'est tout.
+    <h1>Planning des représentants</h1>
+    <p>Indiquez quand vous pouvez représentanter cette semaine ou la semaine prochaine. Choisissez vos créneaux, envoyez, c'est tout.
       Vous pouvez modifier votre réponse à tout moment jusqu'au dimanche 21:00.</p>
 
     <form @submit.prevent="login" class="stack">
       <label>Email
         <input type="email" x-model="id" required autocomplete="email" inputmode="email">
       </label>
-      <label>Code coach
+      <label>Code représentant
         <input x-model="code" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off">
       </label>
       <p class="error" x-show="error" x-text="error"></p>
@@ -45,7 +45,7 @@
   <template x-if="view === 'form' || view === 'availability'">
     <div>
       <header class="topbar">
-        <strong>Planning des coachs</strong>
+        <strong>Planning des représentants</strong>
         <span class="muted small">
           <span x-text="name"></span> ·
           <button type="button" class="link" @click="code = ''; logout()">Se déconnecter</button>
@@ -117,7 +117,7 @@
         </div>
 
         <p class="muted small" x-show="!avail && !error">Chargement…</p>
-        <p class="muted small" x-show="avail" x-text="`${avail?.respondents} coach${avail?.respondents > 1 ? 's ont' : ' a'} répondu pour cette semaine`"></p>
+        <p class="muted small" x-show="avail" x-text="`${avail?.respondents} représentant${avail?.respondents > 1 ? 's ont' : ' a'} répondu pour cette semaine`"></p>
 
         <ol class="rows" x-show="avail">
           <template x-for="row in rows" :key="row.t">

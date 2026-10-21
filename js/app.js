@@ -1,4 +1,4 @@
-// Planning des coachs — frontend. Toute l'app est un seul composant Alpine, utilisé par index.html.
+// Planning des représentants — frontend. Toute l'app est un seul composant Alpine, utilisé par index.html.
 // Backend : apps-script/Code.gs. Mise en place : README.md.
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwPZ0j_SkEsq7GRic00LUREpr1SapZGwbSBNoSK3qLcWyZCYO6tMVjsiqgRXhHGyuuuYQ/exec';
@@ -76,7 +76,7 @@ function idsToRanges(ids) {
 
 function loadCreds() {
   try {
-    return JSON.parse(localStorage.getItem('coach'));
+    return JSON.parse(localStorage.getItem('représentant'));
   } catch {
     return null;
   }
@@ -84,10 +84,10 @@ function loadCreds() {
 
 function saveCreds(creds) {
   try {
-    if (creds) localStorage.setItem('coach', JSON.stringify(creds));
-    else localStorage.removeItem('coach');
+    if (creds) localStorage.setItem('représentant', JSON.stringify(creds));
+    else localStorage.removeItem('représentant');
   } catch {
-    // Navigation privée : le coach devra simplement se reconnecter la prochaine fois
+    // Navigation privée : le représentant devra simplement se reconnecter la prochaine fois
   }
 }
 
@@ -219,7 +219,7 @@ document.addEventListener('alpine:init', () => {
       if (slot.end <= slot.start) slot.end = hhmm(toMin(slot.start) + 30);
     },
 
-    // Un nouveau créneau reprend les horaires du précédent, le jour suivant : la plupart des coachs
+    // Un nouveau créneau reprend les horaires du précédent, le jour suivant : la plupart des représentants
     // ont des horaires réguliers
     addSlot() {
       const last = this.slots[this.slots.length - 1];
