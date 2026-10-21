@@ -40,13 +40,17 @@ function doPost(e) {
   let req = {};
   try {
     req = JSON.parse(e.postData.contents);
+
+    // Les disponibilités des semaines ouvertes sont publiques ; tout le reste demande d'être connecté
+    if (req.action === 'availability' && !req.id) return json(availability(req.week, false));
+
     const member = findMember(req.id, req.code);
     if (!member) return json({ ok: false, error: 'unauthorized' });
 
     switch (req.action) {
       case 'init':         return json(init(member));
       case 'submit':       return json(submit(member, req.week, req.slots));
-      case 'availability': return json(availability(req.week));
+      case 'availability': return json(availability(req.week, true));
       default:             return json({ ok: false, error: 'unknown_action' });
     }
   } catch (err) {
@@ -95,26 +99,36 @@ function submit(member, week, slots) {
   return { ok: true, savedAt: now.toISOString() };
 }
 
-/** Qui est disponible sur chaque créneau de la semaine : { 'Mo:0600': ['Alice B.', ...], ... } */
-function availability(week) {
-  if (!allowedWeeks().includes(week)) return { ok: false, error: 'week_closed' };
+/**
+ * Qui est disponible sur chaque créneau de la semaine : { 'Mo:0600': ['Alice B.', ...], ... }
+ * Sans semaine demandée : la première semaine ouverte. Les semaines passées (lues dans Historique)
+ * ne sont accessibles qu'aux représentants connectés (withHistory).
+ */
+function availability(week, withHistory) {
+  const weeks = allowedWeeks();
+  week = week || weeks[0];
+  const open = weeks.includes(week);
+  const past = withHistory && /^\d{4}-\d{2}-\d{2}$/.test(week) && week < weeks[0];
+  if (!open && !past) return { ok: false, error: 'week_closed' };
 
+  // La liste des semaines ouvertes n'est jamais mise en cache : elle change le dimanche à 21:00
   const cache = CacheService.getScriptCache();
   const hit = cache.get('agg:' + week);
-  if (hit) return JSON.parse(hit);
+  if (hit) return Object.assign(JSON.parse(hit), { weeks });
 
+  const rows = open ? readTable('Réponses') : readTable('Historique', HISTORY_FIRST_ROW);
   const slots = {};
   let respondents = 0;
-  readTable('Réponses').forEach(r => {
-    if (asWeek(r[0]) !== week) return;
+  rows.forEach(r => {
+    if (asWeek(r[0]) !== week || r[4] === 'sans réponse') return;
     respondents++;
     slotsOf(r).forEach(id => (slots[id] = slots[id] || []).push(String(r[2])));
   });
   Object.values(slots).forEach(list => list.sort());
 
   const result = { ok: true, week, respondents, slots };
-  cache.put('agg:' + week, JSON.stringify(result), 300);
-  return result;
+  cache.put('agg:' + week, JSON.stringify(result), open ? 300 : 21600); // semaine passée : figée, 6 h
+  return Object.assign(result, { weeks });
 }
 
 // ---------- Archivage hebdomadaire (déclencheur, dimanche vers 21:30) ----------

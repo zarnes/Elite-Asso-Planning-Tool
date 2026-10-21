@@ -3,6 +3,9 @@
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbwPZ0j_SkEsq7GRic00LUREpr1SapZGwbSBNoSK3qLcWyZCYO6tMVjsiqgRXhHGyuuuYQ/exec';
 
+// Lien vers le Google Drive de l'association, affiché dans le formulaire (laisser vide pour le masquer)
+const DRIVE_URL = '';
+
 const DAYS = [
   { code: 'Mo', short: 'Lun', label: 'Lundi' },
   { code: 'Tu', short: 'Mar', label: 'Mardi' },
@@ -18,6 +21,9 @@ const OPEN = 6 * 60;
 const CLOSE = 21 * 60;
 const TIMES = [];
 for (let m = OPEN; m <= CLOSE; m += 30) TIMES.push(hhmm(m));
+
+// Nombre de semaines passées proposées dans la liste des disponibilités (une année)
+const HISTORY_WEEKS = 52;
 
 const ERRORS = {
   unauthorized: 'Email ou code inconnu.',
@@ -41,6 +47,21 @@ function daysFromToday(week) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.round((new Date(week + 'T00:00:00') - today) / 864e5);
+}
+
+// Calculs sur des dates 'AAAA-MM-JJ', à midi UTC pour que le changement d'heure ne décale jamais le jour
+function addDays(ymd, n) {
+  const d = new Date(ymd + 'T12:00:00Z');
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+// Numéro de semaine ISO (celui des calendriers français) et son année : ceux du jeudi de la semaine
+function isoWeek(monday) {
+  const thursday = new Date(addDays(monday, 3) + 'T12:00:00Z');
+  const year = thursday.getUTCFullYear();
+  const dayOfYear = Math.round((thursday - Date.UTC(year, 0, 1, 12)) / 864e5);
+  return { year, number: Math.floor(dayOfYear / 7) + 1 };
 }
 
 // ---------- Plages ({ day, start, end }) <-> identifiants de demi-heures ('Mo:0600') ----------
@@ -97,15 +118,18 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('app', () => ({
     DAYS,
     TIMES,
-    view: 'loading', // loading | login | form | availability
+    DRIVE_URL,
+    view: 'public', // public | login | form | availability
     id: '',
     code: '',
-    name: '',
-    weeks: [],
-    week: '',
+    hasCreds: false, // identifiants mémorisés sur cet appareil
+    name: '', // renseigné une fois connecté
+    weeks: [], // semaines ouvertes, renvoyées par le serveur
+    week: '', // semaine affichée dans le formulaire
     drafts: {}, // semaine -> plages affichées dans le formulaire
     entries: {}, // semaine -> { slots, submittedAt } tels qu'enregistrés sur le serveur
     lastSlots: [],
+    availWeek: '', // semaine affichée dans les disponibilités ('' = choisie par le serveur)
     avail: null,
     availDay: DAYS[(new Date().getDay() + 6) % 7].code,
     busy: false,
@@ -114,29 +138,33 @@ document.addEventListener('alpine:init', () => {
 
     init() {
       const creds = loadCreds();
-      if (!creds) return (this.view = 'login');
-      this.id = creds.id;
-      this.code = creds.code;
-      this.login().then(() => {
-        if (this.view === 'loading') this.view = 'login';
-      });
+      if (creds) {
+        this.id = creds.id;
+        this.code = creds.code;
+        this.hasCreds = true;
+      }
+      this.loadAvailability();
     },
 
     async call(action, extra = {}) {
       if (API_URL.startsWith('PASTE')) throw new Error('API_URL non renseignée dans js/app.js');
+      // Sans identifiants, seules les disponibilités des semaines ouvertes sont accessibles
+      const withCreds = Boolean(this.name) || action === 'init';
+      const body = withCreds ? { action, id: this.id, code: this.code, ...extra } : { action, ...extra };
       let data;
       try {
         // Volontairement sans en-tête Content-Type : en text/plain, le navigateur n'envoie pas
         // de requête CORS préalable (preflight), à laquelle Apps Script ne sait pas répondre
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          body: JSON.stringify({ action, id: this.id, code: this.code, ...extra }),
-        });
+        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(body) });
         data = await res.json();
       } catch {
         throw new Error('Erreur réseau, veuillez réessayer.');
       }
-      if (data.error === 'unauthorized') this.logout();
+      if (data.error === 'unauthorized') {
+        // Une requête publique refusée n'est pas un problème d'identifiants : on reste sur la page
+        if (!withCreds) throw new Error('Les disponibilités ne sont pas accessibles pour le moment.');
+        this.logout();
+      }
       if (!data.ok) throw new Error(ERRORS[data.error] || 'Une erreur est survenue.');
       return data;
     },
@@ -154,10 +182,26 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
+    // ----- Navigation et connexion -----
+
+    showPublic() {
+      this.view = 'public';
+      this.error = '';
+      if (!this.avail) this.loadAvailability();
+    },
+
+    // Avec des identifiants mémorisés, on se connecte directement, sans repasser par le formulaire
+    openLogin() {
+      this.error = '';
+      if (this.hasCreds) this.login();
+      else this.view = 'login';
+    },
+
     login() {
       return this.run(async () => {
         const data = await this.call('init');
         saveCreds({ id: this.id, code: this.code });
+        this.hasCreds = true;
         this.name = data.name;
         this.weeks = data.weeks;
         this.entries = data.entries;
@@ -169,17 +213,26 @@ document.addEventListener('alpine:init', () => {
       });
     },
 
+    // Identifiants refusés par le serveur : on les oublie et on redemande
     logout() {
       saveCreds(null);
+      this.hasCreds = false;
+      this.name = '';
       this.view = 'login';
     },
 
-    // ----- Semaines -----
-
-    selectWeek(w) {
-      this.week = w;
-      if (this.view === 'availability') this.loadAvailability();
+    signOut() {
+      this.code = '';
+      this.logout();
+      this.view = 'public';
+      // Les semaines passées ne sont visibles que connecté
+      if (this.availWeek && !this.weeks.includes(this.availWeek)) {
+        this.availWeek = this.weeks[0];
+        this.loadAvailability();
+      }
     },
+
+    // ----- Semaines -----
 
     weekTitle(w) {
       const days = daysFromToday(w);
@@ -192,6 +245,22 @@ document.addEventListener('alpine:init', () => {
       end.setDate(end.getDate() + 6);
       const fmt = d => d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
       return fmt(start) + ' – ' + fmt(end);
+    },
+
+    // Libellé d'une semaine dans la liste : « S43 · 19 oct. – 25 oct. · Cette semaine »
+    weekOption(w) {
+      const { year, number } = isoWeek(w);
+      let label = `S${number} · ${this.weekRange(w)}`;
+      if (year !== new Date().getFullYear()) label += ' ' + year;
+      if (daysFromToday(w) > -7) label += ' · ' + this.weekTitle(w);
+      return label;
+    },
+
+    // Les semaines de la liste des disponibilités : les semaines ouvertes, puis une année en arrière
+    get yearWeeks() {
+      if (!this.weeks.length) return [];
+      const last = this.weeks[this.weeks.length - 1];
+      return Array.from({ length: this.weeks.length + HISTORY_WEEKS }, (_, i) => addDays(last, -7 * i));
     },
 
     // ----- Formulaire -----
@@ -257,12 +326,20 @@ document.addEventListener('alpine:init', () => {
       this.loadAvailability();
     },
 
+    selectAvailWeek(w) {
+      this.availWeek = w;
+      this.loadAvailability();
+    },
+
     loadAvailability() {
-      const week = this.week;
+      const week = this.availWeek;
       this.avail = null;
       return this.run(async () => {
-        const data = await this.call('availability', { week });
-        if (this.week === week) this.avail = data; // ignore une réponse arrivée après un changement de semaine
+        const data = await this.call('availability', week ? { week } : {});
+        if (this.availWeek !== week) return; // ignore une réponse arrivée après un changement de semaine
+        if (!this.name) this.weeks = data.weeks;
+        this.availWeek = data.week;
+        this.avail = data;
       });
     },
 

@@ -42,10 +42,16 @@ body {
   background: var(--bg);
 }
 
-main, .topbar, .segmented, .weeks, body > div > .error {
+main, .topbar, .segmented, .weeks, .week-picker, .intro {
   max-width: 34rem;
   margin-inline: auto;
   padding-inline: 16px;
+}
+
+/* Le bandeau d'erreur a ses propres marges intérieures : on l'aligne sur le contenu autrement */
+body > .error {
+  width: min(100% - 32px, 34rem - 32px);
+  margin-inline: auto;
 }
 
 main { padding-bottom: 24px; }
@@ -120,6 +126,19 @@ button.link {
   text-decoration: underline;
 }
 
+button.compact {
+  width: auto;
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+a.drive {
+  justify-self: center;
+  color: var(--accent);
+}
+
 .error {
   padding: 10px 14px;
   border-radius: var(--radius);
@@ -132,7 +151,7 @@ button.link {
 .topbar {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   padding-block: 16px 8px;
 }
@@ -167,6 +186,8 @@ button.link {
 }
 
 .week span { font-weight: 400; }
+
+.week-picker { margin-block: 8px; }
 
 /* ---------- Cartes de créneaux ---------- */
 

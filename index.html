@@ -15,15 +15,22 @@
 </head>
 <body x-data="app" x-cloak>
 
-  <!-- ========== Chargement ========== -->
-  <main x-show="view === 'loading'" class="center">
-    <p class="muted">Chargement…</p>
-  </main>
+  <!-- ========== En-tête, commun à toutes les vues ========== -->
+  <header class="topbar">
+    <strong>Planning des représentants</strong>
+    <span class="muted small" x-show="name">
+      <span x-text="name"></span> ·
+      <button type="button" class="link" @click="signOut">Se déconnecter</button>
+    </span>
+    <button type="button" class="compact" x-show="!name && view === 'public'" :disabled="busy" @click="openLogin"
+            x-text="hasCreds ? 'Mon planning' : 'Se connecter'"></button>
+    <button type="button" class="link small" x-show="!name && view === 'login'" @click="showPublic">← Disponibilités</button>
+  </header>
 
-  <!-- ========== Accueil + connexion ========== -->
+  <!-- ========== Connexion ========== -->
   <main x-show="view === 'login'" class="login">
-    <h1>Planning des représentants</h1>
-    <p>Indiquez quand vous pouvez représentanter cette semaine ou la semaine prochaine. Choisissez vos créneaux, envoyez, c'est tout.
+    <h1>Connexion</h1>
+    <p>Indiquez vos disponibilités pour cette semaine ou la semaine prochaine. Choisissez vos créneaux, envoyez, c'est tout.
       Vous pouvez modifier votre réponse à tout moment jusqu'au dimanche 21:00.</p>
 
     <form @submit.prevent="login" class="stack">
@@ -38,99 +45,108 @@
     </form>
 
     <p class="muted small">Votre email, votre nom et vos disponibilités sont enregistrés dans le Google Sheet de l'association
-      et servent uniquement à organiser les séances. Votre email et votre code sont mémorisés sur cet appareil.</p>
+      et servent uniquement à organiser les séances. Votre nom et vos disponibilités sont visibles sur la page d'accueil.
+      Votre email et votre code sont mémorisés sur cet appareil.</p>
   </main>
 
-  <!-- ========== Connecté ========== -->
-  <template x-if="view === 'form' || view === 'availability'">
-    <div>
-      <header class="topbar">
-        <strong>Planning des représentants</strong>
-        <span class="muted small">
-          <span x-text="name"></span> ·
-          <button type="button" class="link" @click="code = ''; logout()">Se déconnecter</button>
-        </span>
-      </header>
+  <!-- ========== Onglets, une fois connecté ========== -->
+  <nav class="segmented" x-show="name && (view === 'form' || view === 'availability')">
+    <button type="button" :aria-pressed="view === 'form'" @click="view = 'form'; error = ''">Mes créneaux</button>
+    <button type="button" :aria-pressed="view === 'availability'" @click="showAvailability">Disponibilités</button>
+  </nav>
 
-      <nav class="segmented">
-        <button type="button" :aria-pressed="view === 'form'" @click="view = 'form'; error = ''">Mes créneaux</button>
-        <button type="button" :aria-pressed="view === 'availability'" @click="showAvailability">Disponibilités</button>
-      </nav>
+  <!-- ========== Choix de la semaine ========== -->
+  <p class="intro muted small" x-show="view === 'public'">
+    Les créneaux où les représentants de l'association sont disponibles, demi-heure par demi-heure.
+  </p>
 
-      <div class="weeks">
-        <template x-for="w in weeks" :key="w">
-          <button type="button" class="week" :aria-pressed="week === w" @click="selectWeek(w)">
-            <strong x-text="weekTitle(w)"></strong>
-            <span class="small" x-text="weekRange(w)"></span>
-          </button>
-        </template>
-      </div>
+  <!-- Formulaire et accueil : les semaines ouvertes -->
+  <div class="weeks" x-show="view === 'form' || view === 'public'">
+    <template x-for="w in weeks" :key="w">
+      <button type="button" class="week" :aria-pressed="(view === 'form' ? week : availWeek) === w"
+              @click="view === 'form' ? (week = w) : selectAvailWeek(w)">
+        <strong x-text="weekTitle(w)"></strong>
+        <span class="small" x-text="weekRange(w)"></span>
+      </button>
+    </template>
+  </div>
 
-      <p class="error" x-show="error" x-text="error"></p>
+  <!-- Disponibilités, connecté : toutes les semaines de l'année -->
+  <div class="week-picker" x-show="view === 'availability'">
+    <select aria-label="Semaine" @change="selectAvailWeek($event.target.value)">
+      <template x-for="w in yearWeeks" :key="w">
+        <option :value="w" x-text="weekOption(w)" :selected="w === availWeek"></option>
+      </template>
+    </select>
+  </div>
 
-      <!-- ----- Mes créneaux ----- -->
-      <main x-show="view === 'form'">
-        <p class="muted small" x-text="status"></p>
+  <p class="error" x-show="error && view !== 'login'" x-text="error"></p>
 
-        <div class="stack">
-          <template x-for="(slot, i) in slots" :key="slot.key">
-            <div class="slot">
-              <select class="day" x-model="slot.day" aria-label="Jour">
-                <template x-for="d in DAYS">
-                  <option :value="d.code" x-text="d.label" :selected="d.code === slot.day"></option>
-                </template>
-              </select>
-              <button type="button" class="remove" @click="removeSlot(i)" aria-label="Supprimer le créneau">✕</button>
-              <select x-model="slot.start" @change="fixEnd(slot)" aria-label="Heure de début">
-                <template x-for="t in TIMES.slice(0, -1)">
-                  <option :value="t" x-text="t" :selected="t === slot.start"></option>
-                </template>
-              </select>
-              <select x-model="slot.end" aria-label="Heure de fin">
-                <template x-for="t in endTimes(slot)">
-                  <option :value="t" x-text="t" :selected="t === slot.end"></option>
-                </template>
-              </select>
-            </div>
-          </template>
+  <!-- ========== Mes créneaux ========== -->
+  <main x-show="view === 'form'">
+    <p class="muted small" x-text="status"></p>
 
-          <p class="empty" x-show="!slots.length">Aucun créneau : en envoyant, vous serez noté(e) indisponible cette semaine.</p>
-
-          <button type="button" class="secondary" @click="addSlot">+ Ajouter un créneau</button>
+    <div class="stack">
+      <template x-for="(slot, i) in slots" :key="slot.key">
+        <div class="slot">
+          <select class="day" x-model="slot.day" aria-label="Jour">
+            <template x-for="d in DAYS">
+              <option :value="d.code" x-text="d.label" :selected="d.code === slot.day"></option>
+            </template>
+          </select>
+          <button type="button" class="remove" @click="removeSlot(i)" aria-label="Supprimer le créneau">✕</button>
+          <select x-model="slot.start" @change="fixEnd(slot)" aria-label="Heure de début">
+            <template x-for="t in TIMES.slice(0, -1)">
+              <option :value="t" x-text="t" :selected="t === slot.start"></option>
+            </template>
+          </select>
+          <select x-model="slot.end" aria-label="Heure de fin">
+            <template x-for="t in endTimes(slot)">
+              <option :value="t" x-text="t" :selected="t === slot.end"></option>
+            </template>
+          </select>
         </div>
+      </template>
 
-        <div class="bottombar">
-          <button type="button" @click="submit" :disabled="busy"
-                  x-text="busy ? 'Enregistrement…' : slots.length ? 'Envoyer' : 'Envoyer : pas disponible'"></button>
-        </div>
-      </main>
+      <p class="empty" x-show="!slots.length">Aucun créneau : en envoyant, vous serez noté(e) indisponible cette semaine.</p>
 
-      <!-- ----- Disponibilités ----- -->
-      <main x-show="view === 'availability'">
-        <div class="days">
-          <template x-for="d in DAYS" :key="d.code">
-            <button type="button" :aria-pressed="availDay === d.code" @click="availDay = d.code">
-              <span x-text="d.short"></span>
-              <span class="small peak" x-text="avail ? dayPeak(d.code) : ''"></span>
-            </button>
-          </template>
-        </div>
+      <button type="button" class="secondary" @click="addSlot">+ Ajouter un créneau</button>
 
-        <p class="muted small" x-show="!avail && !error">Chargement…</p>
-        <p class="muted small" x-show="avail" x-text="`${avail?.respondents} représentant${avail?.respondents > 1 ? 's ont' : ' a'} répondu pour cette semaine`"></p>
-
-        <ol class="rows" x-show="avail">
-          <template x-for="row in rows" :key="row.t">
-            <li :class="{ quiet: !row.names.length }" :style="`--pct: ${row.pct}%`">
-              <span class="time" x-text="row.t"></span>
-              <span class="names" x-text="row.names.join(', ')"></span>
-              <span class="count" x-text="row.names.length || ''"></span>
-            </li>
-          </template>
-        </ol>
-      </main>
+      <a class="drive small" x-show="DRIVE_URL" :href="DRIVE_URL" target="_blank" rel="noopener">
+        Google Drive de l'association ↗
+      </a>
     </div>
-  </template>
+
+    <div class="bottombar">
+      <button type="button" @click="submit" :disabled="busy"
+              x-text="busy ? 'Enregistrement…' : slots.length ? 'Envoyer' : 'Envoyer : pas disponible'"></button>
+    </div>
+  </main>
+
+  <!-- ========== Disponibilités (accueil public et onglet connecté) ========== -->
+  <main x-show="view === 'public' || view === 'availability'">
+    <div class="days">
+      <template x-for="d in DAYS" :key="d.code">
+        <button type="button" :aria-pressed="availDay === d.code" @click="availDay = d.code">
+          <span x-text="d.short"></span>
+          <span class="small peak" x-text="avail ? dayPeak(d.code) : ''"></span>
+        </button>
+      </template>
+    </div>
+
+    <p class="muted small" x-show="!avail && !error">Chargement…</p>
+    <p class="muted small" x-show="avail" x-text="`${avail?.respondents} représentant${avail?.respondents > 1 ? 's ont' : ' a'} répondu pour cette semaine`"></p>
+
+    <ol class="rows" x-show="avail">
+      <template x-for="row in rows" :key="row.t">
+        <li :class="{ quiet: !row.names.length }" :style="`--pct: ${row.pct}%`">
+          <span class="time" x-text="row.t"></span>
+          <span class="names" x-text="row.names.join(', ')"></span>
+          <span class="count" x-text="row.names.length || ''"></span>
+        </li>
+      </template>
+    </ol>
+  </main>
 
   <div class="toast" x-show="message" x-transition.opacity x-text="message" role="status"></div>
 </body>

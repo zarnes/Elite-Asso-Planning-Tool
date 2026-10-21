@@ -1,13 +1,13 @@
 # Planning des représentants
 
-Une petite page web où les représentants de l'association indiquent leurs créneaux de disponibilité, pour cette semaine ou la suivante, et consultent les disponibilités des autres.
+Une petite page web qui affiche publiquement les disponibilités des représentants de l'association. Une fois connectés, les représentants y indiquent leurs créneaux pour cette semaine ou la suivante.
 
 - **Frontend :** des fichiers statiques hébergés sur GitHub Pages. Du HTML/CSS simple, plus [Alpine.js](https://alpinejs.dev) chargé depuis un CDN. Aucune étape de build.
 - **Backend :** un Google Apps Script lié à un Google Sheet. Le Sheet sert de base de données.
 
 ```
-index.html              toute la page (connexion, « Mes créneaux », « Disponibilités »)
-js/app.js               toute la logique du frontend (un seul composant Alpine), API_URL en haut du fichier
+index.html              toute la page (accueil public, connexion, « Mes créneaux », « Disponibilités »)
+js/app.js               toute la logique du frontend (un seul composant Alpine), API_URL et DRIVE_URL en haut du fichier
 css/style.css           les styles, pensés pour mobile. Les couleurs sont des variables dans :root
 manifest.json, icons/   pour pouvoir « ajouter à l'écran d'accueil »
 apps-script/Code.gs     le backend : à coller dans l'éditeur Apps Script du Sheet
@@ -16,11 +16,14 @@ apps-script/appsscript.json  réglages Apps Script (fuseau horaire, accès à l'
 
 ## Fonctionnement
 
-1. Un représentant se connecte avec son **email + code représentant**, tous deux listés dans l'onglet `Membres`. Ils sont mémorisés sur l'appareil (`localStorage`).
-2. Il choisit une semaine et ajoute des créneaux (jour, début, fin). Chaque créneau est découpé en demi-heures : lundi 06:00–07:00 → `Mo:0600,Mo:0630`.
-3. Envoyer le formulaire remplace sa réponse précédente pour cette semaine. Envoyer sans aucun créneau signifie « pas disponible ».
-4. Jusqu'au **dimanche 21:00** (heure de Paris), les semaines ouvertes sont cette semaine et la suivante. Ensuite, la suivante et celle d'après.
-5. Chaque dimanche vers 21:30, un déclencheur déplace les réponses de la semaine terminée de `Réponses` vers `Historique`, et y ajoute une ligne « sans réponse » pour chaque représentant de `Membres` qui n'a pas répondu.
+1. **Accueil, public :** les disponibilités de la semaine en cours et de la suivante, jour par jour, avec les noms. Aucune connexion nécessaire.
+   Le bouton « Se connecter » mène à la connexion ; avec des identifiants mémorisés, il devient « Mon planning » et connecte directement.
+2. Un représentant se connecte avec son **email + code représentant**, tous deux listés dans l'onglet `Membres`. Ils sont mémorisés sur l'appareil (`localStorage`).
+3. Il choisit une semaine et ajoute des créneaux (jour, début, fin). Chaque créneau est découpé en demi-heures : lundi 06:00–07:00 → `Mo:0600,Mo:0630`.
+4. Envoyer le formulaire remplace sa réponse précédente pour cette semaine. Envoyer sans aucun créneau signifie « pas disponible ».
+5. Connecté, l'onglet « Disponibilités » propose en plus une liste de toutes les semaines de l'année écoulée (S43, S42…), lues dans `Historique`.
+6. Jusqu'au **dimanche 21:00** (heure de Paris), les semaines ouvertes sont cette semaine et la suivante. Ensuite, la suivante et celle d'après.
+7. Chaque dimanche vers 21:30, un déclencheur déplace les réponses de la semaine terminée de `Réponses` vers `Historique`, et y ajoute une ligne « sans réponse » pour chaque représentant de `Membres` qui n'a pas répondu.
 
 ### Onglets du Sheet
 
@@ -93,12 +96,15 @@ Ou utilisez [clasp](https://github.com/google/clasp) pour pousser depuis le dép
   ⚠️ Cela change les colonnes de demi-heures : l'historique existant ne sera plus aligné. Archivez-le à part (copie du Sheet) avant de changer les horaires.
 - Heure de clôture : `allowedWeeks()` et le déclencheur dans `setup()`, dans `Code.gs` (relancez `setup` après modification).
 - Textes : directement dans `index.html`. Messages d'erreur : `ERRORS` dans `js/app.js`.
+- Lien vers le Google Drive de l'association (affiché sous le formulaire) : `DRIVE_URL` dans `js/app.js`. Vide = lien masqué.
+- Nombre de semaines passées dans la liste des disponibilités : `HISTORY_WEEKS` dans `js/app.js`.
 - Couleurs : les variables en haut de `css/style.css`.
 - Noms des onglets : ils sont écrits en toutes lettres dans `Code.gs`. Si vous renommez un onglet dans le Sheet, renommez-le aussi dans le code.
 
 ## Remarques
 
 - Les requêtes sont volontairement envoyées en POST `text/plain`. Un `Content-Type` JSON déclencherait une requête CORS préalable (preflight), à laquelle Apps Script ne sait pas répondre.
+- Les disponibilités des semaines ouvertes sont **publiques, noms compris** : n'importe qui peut les voir sans se connecter. Les semaines passées, l'envoi de créneaux et les emails restent réservés aux représentants connectés.
 - L'URL de l'API est visible par tous dans le code de la page. C'est normal : la protection, c'est le code représentant, vérifié côté serveur. Le Sheet lui-même reste privé : partagez-le uniquement avec les administrateurs.
 - Les disponibilités sont mises en cache 5 minutes, et rafraîchies à chaque envoi. Un changement de nom dans `Membres` n'apparaît qu'au prochain envoi du représentant concerné.
 - Le code représentant protège des personnes extérieures, mais ce n'est pas une sécurité forte. Ne stockez rien de sensible dans ce Sheet.
